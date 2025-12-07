@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { MapPin, Maximize2, Bed, Bath } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface Property {
   id: string;
@@ -11,6 +13,7 @@ interface Property {
   price: number;
   size: number;
   bhk: number | null;
+  type: string | null;
   description: string;
   image: string[];
   createdAt: Date;
@@ -22,6 +25,12 @@ interface PropertyCardProps {
 }
 
 export const PropertyCard = ({ properties }: PropertyCardProps) => {
+  const router = useRouter();
+
+  const handleViewProperty = (propertyId: string) => {
+    router.push(`/properties/${propertyId}`);
+  };
+
   return (
     <div className="space-y-8">
       {/* Properties Grid */}
@@ -42,7 +51,7 @@ export const PropertyCard = ({ properties }: PropertyCardProps) => {
           {properties.map((property) => (
             <div
               key={property.id}
-              className="group bg-white rounded-2xl overflow-hidden border border-slate-200 hover:border-blue-300 hover:shadow-2xl transition-all duration-300 cursor-pointer flex flex-col h-full hover:scale-105"
+              className="group bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-lg hover:border-blue-300 hover:shadow-2xl transition-all duration-300 cursor-pointer flex flex-col h-full hover:scale-105"
             >
               {/* Image Container */}
               <div className="relative h-56 bg-slate-200 overflow-hidden">
@@ -54,10 +63,22 @@ export const PropertyCard = ({ properties }: PropertyCardProps) => {
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-300"
                     />
-                    {/* Image Count Badge */}
+                    {/* Image Count Badge - Top Left */}
                     {property.image.length > 1 && (
-                      <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                      <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm text-white text-xs font-semibold px-2.5 py-1 rounded-full">
                         {property.image.length} photos
+                      </div>
+                    )}
+                    {/* Property Type Badge - Top Right */}
+                    {property.type && (
+                      <div className="absolute top-3 right-3">
+                        <Badge className="bg-green-600 text-white hover:bg-green-700 text-xs">
+                          {property.type === "APARTMENT" && "Apartment"}
+                          {property.type === "VILLA" && "Villa"}
+                          {property.type === "PLOT" && "Plot"}
+                          {property.type === "INDEPENDENTHOUSE" &&
+                            "Independent House"}
+                        </Badge>
                       </div>
                     )}
                     {/* Carousel Dots */}
@@ -120,7 +141,10 @@ export const PropertyCard = ({ properties }: PropertyCardProps) => {
                 </div>
 
                 {/* View Button */}
-                <Button className="w-full h-10 rounded-lg font-semibold text-sm bg-slate-900 hover:bg-slate-800 text-white">
+                <Button
+                  className="w-full h-10 rounded-lg font-semibold text-sm bg-slate-900 hover:bg-slate-800 text-white"
+                  onClick={() => handleViewProperty(property.id)}
+                >
                   View Property
                 </Button>
               </div>

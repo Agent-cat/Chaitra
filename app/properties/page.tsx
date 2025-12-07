@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { PropertyCard } from "@/components/PropertyCard";
 import { FilterDrawer, type FilterState } from "@/components/FilterDrawer";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 interface Property {
   id: string;
@@ -22,11 +22,11 @@ interface Property {
   price: number;
   size: number;
   bhk: number | null;
+  type: string | null;
   description: string;
   image: string[];
   createdAt: Date;
   updatedAt: Date;
-  type?: string;
 }
 
 const PropertiesPage = () => {
@@ -98,6 +98,68 @@ const PropertiesPage = () => {
       );
     });
   }, [properties, searchQuery, filters]);
+
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return (
+      filters.bhkFilter !== null ||
+      filters.typeFilter !== null ||
+      filters.priceRange.min !== 0 ||
+      filters.priceRange.max !== 0 ||
+      filters.sizeRange.min !== 0 ||
+      filters.sizeRange.max !== 0
+    );
+  }, [filters]);
+
+  // Get active filter labels
+  const activeFilterLabels = useMemo(() => {
+    const labels: { label: string; key: string }[] = [];
+
+    if (filters.bhkFilter !== null) {
+      labels.push({ label: `${filters.bhkFilter} BHK`, key: "bhk" });
+    }
+    if (filters.typeFilter !== null) {
+      labels.push({ label: filters.typeFilter, key: "type" });
+    }
+    if (filters.priceRange.min !== 0 || filters.priceRange.max !== 0) {
+      labels.push({
+        label: `₹${filters.priceRange.min.toLocaleString(
+          "en-IN"
+        )} - ₹${filters.priceRange.max.toLocaleString("en-IN")}`,
+        key: "price",
+      });
+    }
+    if (filters.sizeRange.min !== 0 || filters.sizeRange.max !== 0) {
+      labels.push({
+        label: `${filters.sizeRange.min} - ${filters.sizeRange.max} Sq.Ft`,
+        key: "size",
+      });
+    }
+
+    return labels;
+  }, [filters]);
+
+  // Remove specific filter
+  const removeFilter = (key: string) => {
+    const newFilters = { ...filters };
+
+    switch (key) {
+      case "bhk":
+        newFilters.bhkFilter = null;
+        break;
+      case "type":
+        newFilters.typeFilter = null;
+        break;
+      case "price":
+        newFilters.priceRange = { min: 0, max: 0 };
+        break;
+      case "size":
+        newFilters.sizeRange = { min: 0, max: 0 };
+        break;
+    }
+
+    setFilters(newFilters);
+  };
 
   return (
     <div className="w-full min-h-screen bg-linear-to-br from-slate-50 to-slate-100 pt-20 pb-10 px-4 md:px-8">
@@ -190,10 +252,36 @@ const PropertiesPage = () => {
           </Card>
         )}
 
-        {/* Filter Button */}
+        {/* Filter Button and Active Filters */}
         {!loading && !error && properties.length > 0 && (
           <div className="mb-8">
-            <FilterDrawer properties={properties} onFilterChange={setFilters} />
+            <div className="flex items-center gap-3 flex-wrap">
+              <FilterDrawer
+                properties={properties}
+                onFilterChange={setFilters}
+              />
+
+              {/* Active Filter Chips */}
+              {hasActiveFilters && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {activeFilterLabels.map((filter) => (
+                    <div
+                      key={filter.key}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white rounded-full text-sm font-medium"
+                    >
+                      <span>{filter.label}</span>
+                      <button
+                        onClick={() => removeFilter(filter.key)}
+                        className="hover:bg-slate-800 rounded-full p-0.5 transition-colors"
+                        title="Remove filter"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

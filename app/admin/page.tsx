@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import type { AuthSession } from "@/types/auth";
+import { Badge } from "@/components/ui/badge";
 import {
   Plus,
   Edit,
@@ -55,8 +56,12 @@ const AdminPanel = () => {
     price: "",
     size: "",
     bhk: "",
+    type: "",
     description: "",
     images: [] as File[],
+    existingImages: [] as string[],
+    videos: [] as File[],
+    existingVideos: [] as string[],
   });
 
   const totalSteps = 3;
@@ -104,16 +109,61 @@ const AdminPanel = () => {
     }));
   };
 
+  const removeExistingImage = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      existingImages: prev.existingImages.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setFormData((prev) => ({
+      ...prev,
+      videos: [...prev.videos, ...files],
+    }));
+  };
+
+  const removeVideo = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      videos: prev.videos.filter((_, i) => i !== index),
+    }));
+  };
+
+  const removeExistingVideo = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      existingVideos: prev.existingVideos.filter((_, i) => i !== index),
+    }));
+  };
+
   const handleSubmit = async () => {
     try {
+      // Validate required fields
+      if (
+        !formData.name ||
+        !formData.address ||
+        !formData.price ||
+        !formData.size ||
+        !formData.description
+      ) {
+        alert("Please fill in all required fields");
+        return;
+      }
+
       const propertyData = {
         name: formData.name,
         address: formData.address,
         price: parseInt(formData.price),
         size: parseInt(formData.size),
         bhk: formData.bhk ? parseInt(formData.bhk) : undefined,
+        type: formData.type || undefined,
         description: formData.description,
         images: formData.images,
+        existingImages: formData.existingImages,
+        videos: formData.videos,
+        existingVideos: formData.existingVideos,
       };
 
       let result;
@@ -127,9 +177,13 @@ const AdminPanel = () => {
         await fetchProperties();
         resetForm();
         setShowCreateForm(false);
+      } else {
+        alert(`Error: ${result.error || "Failed to save property"}`);
+        console.error("Save failed:", result.error);
       }
     } catch (error) {
       console.error("Error saving property:", error);
+      alert("An unexpected error occurred while saving the property");
     }
   };
 
@@ -141,8 +195,12 @@ const AdminPanel = () => {
       price: property.price.toString(),
       size: property.size.toString(),
       bhk: property.bhk?.toString() || "",
+      type: property.type || "",
       description: property.description,
-      images: [], // Reset images for editing - user can upload new ones if needed
+      images: [],
+      existingImages: property.image || [],
+      videos: [],
+      existingVideos: property.video || [],
     });
     setIsEditing(true);
     setShowCreateForm(true);
@@ -190,8 +248,12 @@ const AdminPanel = () => {
       price: "",
       size: "",
       bhk: "",
+      type: "",
       description: "",
       images: [],
+      existingImages: [],
+      videos: [],
+      existingVideos: [],
     });
     setIsEditing(false);
     setEditingProperty(null);
@@ -383,6 +445,27 @@ const AdminPanel = () => {
                       />
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Property Type
+                    </label>
+                    <select
+                      value={formData.type}
+                      onChange={(e) =>
+                        handleInputChange("type", e.target.value)
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+                    >
+                      <option value="">Select property type</option>
+                      <option value="APARTMENT">Apartment</option>
+                      <option value="VILLA">Villa</option>
+                      <option value="PLOT">Plot</option>
+                      <option value="INDEPENDENTHOUSE">
+                        Independent House
+                      </option>
+                    </select>
+                  </div>
                 </div>
 
                 <div>
@@ -410,9 +493,34 @@ const AdminPanel = () => {
                   Property Images
                 </h2>
 
+                {formData.existingImages.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">
+                      Current Images ({formData.existingImages.length})
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {formData.existingImages.map((image, index) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={image}
+                            alt={`Existing ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg"
+                          />
+                          <button
+                            onClick={() => removeExistingImage(index)}
+                            className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Upload Images
+                    Upload New Images
                   </label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
                     <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -442,7 +550,7 @@ const AdminPanel = () => {
                 {formData.images.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium text-gray-700 mb-3">
-                      Uploaded Images ({formData.images.length})
+                      New Images to Upload ({formData.images.length})
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                       {formData.images.map((image, index) => (
@@ -463,6 +571,92 @@ const AdminPanel = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Videos Section */}
+                <div className="border-t pt-6">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                    Property Videos
+                  </h2>
+
+                  {formData.existingVideos.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700 mb-3">
+                        Current Videos ({formData.existingVideos.length})
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {formData.existingVideos.map((video, index) => (
+                          <div key={index} className="relative group">
+                            <div className="w-full h-32 bg-gray-900 rounded-lg flex items-center justify-center">
+                              <span className="text-white text-sm">
+                                Video {index + 1}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => removeExistingVideo(index)}
+                              className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Upload New Videos
+                    </label>
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                      <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 mb-2">
+                        Click to upload or drag and drop
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        MP4, WebM, MOV up to 100MB
+                      </p>
+                      <input
+                        type="file"
+                        multiple
+                        accept="video/*"
+                        onChange={handleVideoUpload}
+                        className="hidden"
+                        id="file-upload-video"
+                      />
+                      <label
+                        htmlFor="file-upload-video"
+                        className="mt-4 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 cursor-pointer transition-colors"
+                      >
+                        Select Videos
+                      </label>
+                    </div>
+                  </div>
+
+                  {formData.videos.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700 mb-3 mt-4">
+                        New Videos to Upload ({formData.videos.length})
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {formData.videos.map((video, index) => (
+                          <div key={index} className="relative group">
+                            <div className="w-full h-32 bg-gray-900 rounded-lg flex items-center justify-center">
+                              <span className="text-white text-sm">
+                                {video.name.substring(0, 10)}...
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => removeVideo(index)}
+                              className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -575,6 +769,18 @@ const AdminPanel = () => {
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <ImageIcon className="w-12 h-12 text-gray-400" />
+                      </div>
+                    )}
+                    {/* Property Type Badge - Top Right */}
+                    {property.type && (
+                      <div className="absolute top-2 right-2">
+                        <Badge className="bg-blue-600 text-white hover:bg-blue-700 text-xs">
+                          {property.type === "APARTMENT" && "Apartment"}
+                          {property.type === "VILLA" && "Villa"}
+                          {property.type === "PLOT" && "Plot"}
+                          {property.type === "INDEPENDENTHOUSE" &&
+                            "Independent House"}
+                        </Badge>
                       </div>
                     )}
                   </div>

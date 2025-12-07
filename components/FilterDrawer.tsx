@@ -19,11 +19,11 @@ interface Property {
   price: number;
   size: number;
   bhk: number | null;
+  type: string | null;
   description: string;
   image: string[];
   createdAt: Date;
   updatedAt: Date;
-  type?: string;
 }
 
 interface FilterDrawerProps {
