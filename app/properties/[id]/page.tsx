@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getPropertyById } from "@/action/property.action";
 import { authClient } from "@/lib/auth-client";
@@ -631,4 +631,10 @@ const PropertyDetailsPage = () => {
   );
 };
 
-export default PropertyDetailsPage;
+export default function PropertyDetailsPageWrapper() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PropertyDetailsPage />
+    </Suspense>
+  );
+}

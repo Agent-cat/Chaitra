@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { getProperties } from "@/action/property.action";
 import {
@@ -332,4 +332,10 @@ const PropertiesPage = () => {
   );
 };
 
-export default PropertiesPage;
+export default function PropertiesPageWrapper() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PropertiesPage />
+    </Suspense>
+  );
+}
