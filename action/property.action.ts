@@ -76,6 +76,7 @@ export const uploadVideos = async (videos: File[]) => {
 export const createProperty = async (data: {
   name: string;
   address: string;
+  location: string;
   price: number;
   size: number;
   bhk?: number;
@@ -105,6 +106,7 @@ export const createProperty = async (data: {
       data: {
         name: data.name,
         address: data.address,
+        location: data.location,
         price: data.price,
         size: data.size,
         bhk: data.bhk,
@@ -157,6 +159,7 @@ export const updateProperty = async (
   data: {
     name?: string;
     address?: string;
+    location?: string;
     price?: number;
     size?: number;
     bhk?: number;
@@ -211,6 +214,7 @@ export const updateProperty = async (
 
     if (data.name !== undefined) updateData.name = data.name;
     if (data.address !== undefined) updateData.address = data.address;
+    if (data.location !== undefined) updateData.location = data.location;
     if (data.price !== undefined) updateData.price = data.price;
     if (data.size !== undefined) updateData.size = data.size;
     if (data.bhk !== undefined) updateData.bhk = data.bhk;

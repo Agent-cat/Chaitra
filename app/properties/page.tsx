@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { getProperties } from "@/action/property.action";
 import {
   Card,
@@ -30,16 +31,34 @@ interface Property {
 }
 
 const PropertiesPage = () => {
+  const searchParams = useSearchParams();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [locationFilter, setLocationFilter] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [priceRangeFilter, setPriceRangeFilter] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     priceRange: { min: 0, max: 0 },
     sizeRange: { min: 0, max: 0 },
     bhkFilter: null,
     typeFilter: null,
   });
+
+  // Parse query params on mount
+  useEffect(() => {
+    const location = searchParams.get("location");
+    const type = searchParams.get("type");
+    const priceRange = searchParams.get("priceRange");
+
+    if (location) setLocationFilter(location);
+    if (type) {
+      setTypeFilter(type);
+      setFilters((prev) => ({ ...prev, typeFilter: type }));
+    }
+    if (priceRange) setPriceRangeFilter(priceRange);
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchProperties = async () => {
@@ -115,18 +134,30 @@ const PropertiesPage = () => {
   const activeFilterLabels = useMemo(() => {
     const labels: { label: string; key: string }[] = [];
 
+    // Add location filter from query params
+    if (locationFilter) {
+      labels.push({ label: locationFilter, key: "location" });
+    }
+
+    // Add type filter from query params or internal filters
+    if (typeFilter) {
+      labels.push({ label: typeFilter, key: "type" });
+    }
+
+    // Add price range from query params
+    if (priceRangeFilter) {
+      labels.push({ label: priceRangeFilter, key: "price" });
+    }
+
     if (filters.bhkFilter !== null) {
       labels.push({ label: `${filters.bhkFilter} BHK`, key: "bhk" });
-    }
-    if (filters.typeFilter !== null) {
-      labels.push({ label: filters.typeFilter, key: "type" });
     }
     if (filters.priceRange.min !== 0 || filters.priceRange.max !== 0) {
       labels.push({
         label: `₹${filters.priceRange.min.toLocaleString(
           "en-IN"
         )} - ₹${filters.priceRange.max.toLocaleString("en-IN")}`,
-        key: "price",
+        key: "priceRange",
       });
     }
     if (filters.sizeRange.min !== 0 || filters.sizeRange.max !== 0) {
@@ -137,20 +168,27 @@ const PropertiesPage = () => {
     }
 
     return labels;
-  }, [filters]);
+  }, [filters, locationFilter, typeFilter, priceRangeFilter]);
 
   // Remove specific filter
   const removeFilter = (key: string) => {
     const newFilters = { ...filters };
 
     switch (key) {
-      case "bhk":
-        newFilters.bhkFilter = null;
+      case "location":
+        setLocationFilter(null);
         break;
       case "type":
+        setTypeFilter(null);
         newFilters.typeFilter = null;
         break;
       case "price":
+        setPriceRangeFilter(null);
+        break;
+      case "bhk":
+        newFilters.bhkFilter = null;
+        break;
+      case "priceRange":
         newFilters.priceRange = { min: 0, max: 0 };
         break;
       case "size":

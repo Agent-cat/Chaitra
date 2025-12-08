@@ -75,6 +75,7 @@ model property{
   id String @id @default(uuid())
   name String
   address String
+  location String
   price Int
   size Int
   bhk Int?

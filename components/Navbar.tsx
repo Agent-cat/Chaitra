@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { useOnClickOutside } from "@/hooks/useOnClickOutside";
 import { navLinks } from "@/constants/navconstants";
@@ -9,6 +10,7 @@ import { User, LogOut, Heart, Settings } from "lucide-react";
 import type { AuthSession } from "@/types/auth";
 
 const Navbar = () => {
+  const pathname = usePathname();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { data: session, isPending } = authClient.useSession() as {
@@ -43,16 +45,27 @@ const Navbar = () => {
           </div>
 
           <div className="hidden md:flex items-center space-x-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 text-sm font-light transition-all duration-300 ease-out relative group rounded-lg hover:bg-gray-50/50"
-              >
-                {link.label}
-                <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-linear-to-r from-transparent via-gray-900 to-transparent transform -translate-x-1/2 group-hover:w-full group-hover:transition-all group-hover:duration-500 group-hover:ease-out rounded-full"></span>
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`px-3 py-2 text-sm transition-all duration-300 ease-out relative group rounded-lg ${
+                    isActive
+                      ? "text-gray-900"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50/50"
+                  }`}
+                >
+                  {link.label}
+                  <span
+                    className={`absolute bottom-1 left-1/2 h-0.5 bg-linear-to-r from-transparent via-gray-900 to-transparent transform -translate-x-1/2 transition-all duration-500 ease-out rounded-full ${
+                      isActive ? "w-full" : "w-0 group-hover:w-full"
+                    }`}
+                  ></span>
+                </Link>
+              );
+            })}
           </div>
 
           <div className="flex items-center">

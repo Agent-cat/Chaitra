@@ -53,6 +53,7 @@ const AdminPanel = () => {
   const [formData, setFormData] = useState({
     name: "",
     address: "",
+    location: "",
     price: "",
     size: "",
     bhk: "",
@@ -144,6 +145,7 @@ const AdminPanel = () => {
       if (
         !formData.name ||
         !formData.address ||
+        !formData.location ||
         !formData.price ||
         !formData.size ||
         !formData.description
@@ -155,6 +157,7 @@ const AdminPanel = () => {
       const propertyData = {
         name: formData.name,
         address: formData.address,
+        location: formData.location,
         price: parseInt(formData.price),
         size: parseInt(formData.size),
         bhk: formData.bhk ? parseInt(formData.bhk) : undefined,
@@ -192,6 +195,7 @@ const AdminPanel = () => {
     setFormData({
       name: property.name,
       address: property.address,
+      location: property.location || "",
       price: property.price.toString(),
       size: property.size.toString(),
       bhk: property.bhk?.toString() || "",
@@ -245,6 +249,7 @@ const AdminPanel = () => {
     setFormData({
       name: "",
       address: "",
+      location: "",
       price: "",
       size: "",
       bhk: "",
@@ -377,6 +382,24 @@ const AdminPanel = () => {
                       }
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
                       placeholder="Enter property address"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Location (City/Area)
+                  </label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={formData.location}
+                      onChange={(e) =>
+                        handleInputChange("location", e.target.value)
+                      }
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+                      placeholder="Enter location (e.g., Mumbai, Bangalore)"
                     />
                   </div>
                 </div>
