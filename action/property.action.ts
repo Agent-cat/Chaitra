@@ -84,6 +84,7 @@ export const createProperty = async (data: {
   description: string;
   images: File[];
   videos?: File[];
+  isRecommended?: boolean;
 }) => {
   try {
     // Upload images first
@@ -114,6 +115,7 @@ export const createProperty = async (data: {
         description: data.description,
         image: uploadResult.paths || [],
         video: videoPaths,
+        isRecommended: data.isRecommended || false,
       },
     });
     return { success: true, property };
@@ -123,14 +125,113 @@ export const createProperty = async (data: {
   }
 };
 
-export const getProperties = async () => {
+export const getProperties = async ({
+  page = 1,
+  limit = 10,
+  search = "",
+  type,
+  minPrice,
+  maxPrice,
+  minSize,
+  maxSize,
+  bhk,
+  location,
+}: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  type?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  minSize?: number;
+  maxSize?: number;
+  bhk?: number;
+  location?: string;
+} = {}) => {
   try {
-    const properties = await prisma.property.findMany({
-      orderBy: {
-        createdAt: "desc",
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { address: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+        { location: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    if (type) where.type = type;
+
+    if (location) {
+      where.OR = [
+        ...(where.OR || []),
+        { location: { contains: location, mode: 'insensitive' } }
+      ]
+    }
+
+    if (minPrice || maxPrice) {
+      where.price = {};
+      if (minPrice) where.price.gte = minPrice;
+      if (maxPrice) where.price.lte = maxPrice;
+    }
+
+    if (minSize || maxSize) {
+      where.size = {};
+      if (minSize) where.size.gte = minSize;
+      if (maxSize) where.size.lte = maxSize;
+    }
+
+    if (bhk) where.bhk = bhk;
+
+    const [properties, total, stats, types, bhks] = await Promise.all([
+      prisma.property.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+      prisma.property.count({ where }),
+      prisma.property.aggregate({
+        _min: { price: true, size: true },
+        _max: { price: true, size: true },
+      }),
+      prisma.property.findMany({
+        select: { type: true },
+        distinct: ["type"],
+        where: { type: { not: null } },
+      }),
+      prisma.property.findMany({
+        select: { bhk: true },
+        distinct: ["bhk"],
+        where: { bhk: { not: null } },
+      }),
+    ]);
+
+    return {
+      success: true,
+      properties,
+      stats: {
+        minPrice: stats._min.price || 0,
+        maxPrice: stats._max.price || 0,
+        minSize: stats._min.size || 0,
+        maxSize: stats._max.size || 0,
+        types: types
+          .map((t) => t.type)
+          .filter((t): t is NonNullable<typeof t> => t !== null),
+        bhks: bhks
+          .map((t) => t.bhk)
+          .filter((b): b is number => b !== null)
+          .sort((a, b) => a - b),
       },
-    });
-    return { success: true, properties };
+      pagination: {
+        total,
+        totalPages: Math.ceil(total / limit),
+        currentPage: page,
+        limit,
+      },
+    };
   } catch (error) {
     console.error("Error fetching properties:", error);
     return { success: false, error: "Failed to fetch properties" };
@@ -169,6 +270,7 @@ export const updateProperty = async (
     existingImages?: string[];
     videos?: File[];
     existingVideos?: string[];
+    isRecommended?: boolean;
   }
 ) => {
   try {
@@ -223,6 +325,8 @@ export const updateProperty = async (
       updateData.description = data.description;
     if (finalImages !== undefined) updateData.image = finalImages;
     if (finalVideos !== undefined) updateData.video = finalVideos;
+    if (data.isRecommended !== undefined)
+      updateData.isRecommended = data.isRecommended;
 
     // Only update if there are changes
     if (Object.keys(updateData).length === 0) {

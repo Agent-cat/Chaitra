@@ -83,6 +83,7 @@ model property{
   description String
   image String[]
   video String[]
+  isRecommended Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

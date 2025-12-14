@@ -31,6 +31,7 @@ interface PropertyPreview {
   video: string[] | null;
   createdAt: Date;
   updatedAt: Date;
+  isRecommended: boolean;
 }
 
 const HomePage = () => {
@@ -113,8 +114,11 @@ const HomePage = () => {
             if (ranges.length > 0) setPriceRange(ranges[0].value);
           }
 
-          // Pick latest 3-4 properties for recommendation strip
-          setRecommendedProperties(props.slice(0, 4));
+          // Pick recommended properties
+          const recommended = props.filter((p) => p.isRecommended);
+          setRecommendedProperties(
+            recommended.length > 0 ? recommended : props.slice(0, 4)
+          );
         }
       } catch (err) {
         console.error("Failed to fetch properties for filters:", err);
