@@ -23,7 +23,10 @@ import {
   X,
   Upload,
   Search,
+
   Filter,
+  Star,
+  Check,
 } from "lucide-react";
 import {
   createProperty,
@@ -32,6 +35,7 @@ import {
   getProperties,
   uploadImages,
 } from "@/action/property.action";
+import { toast } from "sonner";
 
 const AdminPanel = () => {
   const { data: session, isPending } = authClient.useSession() as {
@@ -64,6 +68,8 @@ const AdminPanel = () => {
     videos: [] as File[],
     existingVideos: [] as string[],
   });
+  const [viewMode, setViewMode] = useState<"ALL" | "RECOMMENDED">("ALL");
+  const [showRecommendationModal, setShowRecommendationModal] = useState(false);
 
   const totalSteps = 3;
 
@@ -150,7 +156,7 @@ const AdminPanel = () => {
         !formData.size ||
         !formData.description
       ) {
-        alert("Please fill in all required fields");
+        toast.error("Please fill in all required fields");
         return;
       }
 
@@ -180,13 +186,16 @@ const AdminPanel = () => {
         await fetchProperties();
         resetForm();
         setShowCreateForm(false);
+        toast.success(
+          isEditing ? "Property updated successfully" : "Property created successfully"
+        );
       } else {
-        alert(`Error: ${result.error || "Failed to save property"}`);
+        toast.error(`Error: ${result.error || "Failed to save property"}`);
         console.error("Save failed:", result.error);
       }
     } catch (error) {
       console.error("Error saving property:", error);
-      alert("An unexpected error occurred while saving the property");
+      toast.error("An unexpected error occurred while saving the property");
     }
   };
 
@@ -230,13 +239,46 @@ const AdminPanel = () => {
         const result = await deleteProperty(propertyToDelete);
         if (result.success) {
           await fetchProperties();
+          toast.success("Property deleted successfully");
         }
       } catch (error) {
         console.error("Error deleting property:", error);
+        toast.error("Failed to delete property");
       } finally {
         setShowDeleteModal(false);
         setPropertyToDelete(null);
       }
+    }
+  };
+
+  const toggleRecommendation = async (property: any) => {
+    try {
+      if (!property.isRecommended) {
+        // Checking limit before adding
+        const recommendedCount = properties.filter((p) => p.isRecommended).length;
+        if (recommendedCount >= 4) {
+          toast.error("Limit reached: You can only have up to 4 recommended properties.");
+          return;
+        }
+      }
+
+      const result = await updateProperty(property.id, {
+        isRecommended: !property.isRecommended,
+      });
+
+      if (result.success) {
+        await fetchProperties();
+        toast.success(
+          !property.isRecommended
+            ? "Added to Recommended Properties"
+            : "Removed from Recommended Properties"
+        );
+      } else {
+        toast.error("Failed to update recommendation status");
+      }
+    } catch (error) {
+      console.error("Error toggling recommendation:", error);
+      toast.error("An error occurred while updating recommendation");
     }
   };
 
@@ -338,9 +380,8 @@ const AdminPanel = () => {
               {[1, 2, 3].map((step) => (
                 <div key={step} className="flex-1">
                   <div
-                    className={`h-2 rounded-full ${
-                      step <= currentStep ? "bg-black" : "bg-gray-200"
-                    }`}
+                    className={`h-2 rounded-full ${step <= currentStep ? "bg-black" : "bg-gray-200"
+                      }`}
                   ></div>
                 </div>
               ))}
@@ -745,6 +786,37 @@ const AdminPanel = () => {
             </div>
           </div>
 
+          {/* Tabs */}
+          <div className="flex items-center gap-4 mb-6 border-b border-gray-200">
+            <button
+              onClick={() => setViewMode("ALL")}
+              className={`pb-3 px-1 text-sm font-medium transition-all relative ${viewMode === "ALL"
+                ? "text-black"
+                : "text-gray-500 hover:text-gray-700"
+                }`}
+            >
+              All Properties
+              {viewMode === "ALL" && (
+                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-black rounded-t-full" />
+              )}
+            </button>
+            <button
+              onClick={() => setViewMode("RECOMMENDED")}
+              className={`pb-3 px-1 text-sm font-medium transition-all relative ${viewMode === "RECOMMENDED"
+                ? "text-black"
+                : "text-gray-500 hover:text-gray-700"
+                }`}
+            >
+              Recommended Properties
+              <span className="ml-2 bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">
+                {properties.filter((p) => p.isRecommended).length}/4
+              </span>
+              {viewMode === "RECOMMENDED" && (
+                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-black rounded-t-full" />
+              )}
+            </button>
+          </div>
+
           {/* Search and Filter */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
             <div className="flex items-center space-x-4">
@@ -768,15 +840,20 @@ const AdminPanel = () => {
           {/* Properties Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
             {properties
-              .filter(
-                (property) =>
+              .filter((property) => {
+                const matchesSearch =
                   property.name
                     .toLowerCase()
                     .includes(searchQuery.toLowerCase()) ||
                   property.address
                     .toLowerCase()
-                    .includes(searchQuery.toLowerCase())
-              )
+                    .includes(searchQuery.toLowerCase());
+
+                if (viewMode === "RECOMMENDED") {
+                  return matchesSearch && property.isRecommended;
+                }
+                return matchesSearch;
+              })
               .map((property) => (
                 <div
                   key={property.id}
@@ -796,7 +873,7 @@ const AdminPanel = () => {
                     )}
                     {/* Property Type Badge - Top Right */}
                     {property.type && (
-                      <div className="absolute top-2 right-2">
+                      <div className="absolute top-2 right-2 flex flex-col gap-2 items-end">
                         <Badge className="bg-blue-600 text-white hover:bg-blue-700 text-xs">
                           {property.type === "APARTMENT" && "Apartment"}
                           {property.type === "VILLA" && "Villa"}
@@ -804,6 +881,12 @@ const AdminPanel = () => {
                           {property.type === "INDEPENDENTHOUSE" &&
                             "Independent House"}
                         </Badge>
+                        {property.isRecommended && (
+                          <Badge className="bg-yellow-400 text-black hover:bg-yellow-500 text-xs flex items-center gap-1">
+                            <Star className="w-3 h-3 fill-black" />
+                            Recommended
+                          </Badge>
+                        )}
                       </div>
                     )}
                   </div>
@@ -834,21 +917,35 @@ const AdminPanel = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleEdit(property)}
-                        className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <Edit className="w-4 h-4" />
-                        <span>Edit</span>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(property.id)}
-                        className="flex-1 flex items-center justify-center space-x-1 px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span>Delete</span>
-                      </button>
+                    <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+                      <span className="text-lg font-bold text-gray-900">
+                        ₹{property.price.toLocaleString("en-IN")}
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        {/* Recommendation Star Button */}
+                        <button
+                          onClick={() => toggleRecommendation(property)}
+                          className={`p-2 rounded-lg transition-colors ${property.isRecommended
+                            ? "bg-yellow-50 text-yellow-600 hover:bg-yellow-100"
+                            : "bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                            }`}
+                          title={property.isRecommended ? "Remove from Recommended" : "Add to Recommended"}
+                        >
+                          <Star className={`w-4 h-4 ${property.isRecommended ? "fill-current" : ""}`} />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(property)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(property.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

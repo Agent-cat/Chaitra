@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/select";
 import { Sliders, X } from "lucide-react";
 
+// ... imports
+
 interface Property {
   id: string;
   name: string;
@@ -26,8 +28,18 @@ interface Property {
   updatedAt: Date;
 }
 
+export interface FilterStats {
+  minPrice: number;
+  maxPrice: number;
+  minSize: number;
+  maxSize: number;
+  bhks: number[];
+  types: string[];
+}
+
 interface FilterDrawerProps {
   properties: Property[];
+  stats?: FilterStats;
   onFilterChange: (filters: FilterState) => void;
 }
 
@@ -40,6 +52,7 @@ export interface FilterState {
 
 export const FilterDrawer = ({
   properties,
+  stats,
   onFilterChange,
 }: FilterDrawerProps) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -48,8 +61,19 @@ export const FilterDrawer = ({
   const [bhkFilter, setBhkFilter] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
 
-  // Calculate dynamic ranges from properties
+  // Calculate dynamic ranges from properties or use provided stats
   const dynamicRanges = useMemo(() => {
+    if (stats) {
+      return {
+        minPrice: stats.minPrice,
+        maxPrice: stats.maxPrice,
+        minSize: stats.minSize,
+        maxSize: stats.maxSize,
+        bhk: stats.bhks || [],
+        types: stats.types || [],
+      };
+    }
+
     if (properties.length === 0) {
       return {
         minPrice: 0,
@@ -82,7 +106,7 @@ export const FilterDrawer = ({
       bhk,
       types,
     };
-  }, [properties]);
+  }, [properties, stats]);
 
   // Initialize ranges on first open
   const handleOpen = () => {
@@ -156,9 +180,8 @@ export const FilterDrawer = ({
 
       {/* Drawer */}
       <div
-        className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
+        className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto ${isOpen ? "translate-x-0" : "translate-x-full"
+          }`}
       >
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between">

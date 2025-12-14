@@ -88,9 +88,8 @@ export const PropertyCard = ({ properties }: PropertyCardProps) => {
                       }).map((_, i) => (
                         <div
                           key={i}
-                          className={`h-1.5 rounded-full transition-all ${
-                            i === 0 ? "bg-white w-6" : "bg-white/50 w-1.5"
-                          }`}
+                          className={`h-1.5 rounded-full transition-all ${i === 0 ? "bg-white w-6" : "bg-white/50 w-1.5"
+                            }`}
                         />
                       ))}
                     </div>

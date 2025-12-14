@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo, Suspense } from "react";
+import { useEffect, useState, useMemo, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { getProperties } from "@/action/property.action";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -13,8 +12,21 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { PropertyCard } from "@/components/PropertyCard";
-import { FilterDrawer, type FilterState } from "@/components/FilterDrawer";
+import {
+  FilterDrawer,
+  type FilterState,
+  type FilterStats,
+} from "@/components/FilterDrawer";
 import { Search, X } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Property {
   id: string;
@@ -36,6 +48,7 @@ const PropertiesPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [locationFilter, setLocationFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [priceRangeFilter, setPriceRangeFilter] = useState<string | null>(null);
@@ -45,6 +58,24 @@ const PropertiesPage = () => {
     bhkFilter: null,
     typeFilter: null,
   });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 12,
+    total: 0,
+    totalPages: 0,
+  });
+  const [stats, setStats] = useState<FilterStats | undefined>(undefined);
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      if (searchQuery !== debouncedSearchQuery) {
+        setPagination((prev) => ({ ...prev, page: 1 }));
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, debouncedSearchQuery]);
 
   // Parse query params on mount
   useEffect(() => {
@@ -52,71 +83,82 @@ const PropertiesPage = () => {
     const type = searchParams.get("type");
     const priceRange = searchParams.get("priceRange");
 
-    if (location) setLocationFilter(location);
+    let shouldReset = false;
+
+    if (location) {
+      setLocationFilter(location);
+      shouldReset = true;
+    }
     if (type) {
       setTypeFilter(type);
       setFilters((prev) => ({ ...prev, typeFilter: type }));
+      shouldReset = true;
     }
-    if (priceRange) setPriceRangeFilter(priceRange);
+    if (priceRange) {
+      setPriceRangeFilter(priceRange);
+      shouldReset = true;
+    }
+
+    if (shouldReset) {
+      setPagination(prev => ({ ...prev, page: 1 }));
+    }
   }, [searchParams]);
 
-  useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        setLoading(true);
-        const result = await getProperties();
-        if (result.success && result.properties) {
-          setProperties(result.properties);
-        } else {
-          setError(result.error || "Failed to fetch properties");
+  const fetchProperties = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await getProperties({
+        page: pagination.page,
+        limit: pagination.limit,
+        search: debouncedSearchQuery,
+        location: locationFilter || undefined,
+        type: typeFilter || undefined,
+        minPrice: filters.priceRange.min || undefined,
+        maxPrice: filters.priceRange.max || undefined,
+        minSize: filters.sizeRange.min || undefined,
+        maxSize: filters.sizeRange.max || undefined,
+        bhk: filters.bhkFilter || undefined,
+      });
+
+      if (result.success && result.properties) {
+        setProperties(result.properties as any);
+        if (result.pagination) {
+          setPagination((prev) => ({
+            ...prev,
+            total: result.pagination.total,
+            totalPages: result.pagination.totalPages,
+          }));
         }
-      } catch (err) {
-        setError("An error occurred while fetching properties");
-        console.error(err);
-      } finally {
-        setLoading(false);
+        if (result.stats) {
+          setStats(result.stats);
+        }
+      } else {
+        setError(result.error || "Failed to fetch properties");
       }
-    };
+    } catch (err) {
+      setError("An error occurred while fetching properties");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    pagination.page,
+    pagination.limit,
+    debouncedSearchQuery,
+    locationFilter,
+    typeFilter,
+    filters,
+  ]);
 
+  useEffect(() => {
     fetchProperties();
-  }, []);
+  }, [fetchProperties]);
 
-  // Filter properties based on search query and filters
-  const filteredProperties = useMemo(() => {
-    return properties.filter((property) => {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        property.name.toLowerCase().includes(query) ||
-        property.address.toLowerCase().includes(query) ||
-        property.description.toLowerCase().includes(query);
-
-      const matchesPrice =
-        filters.priceRange.min === 0 && filters.priceRange.max === 0
-          ? true
-          : property.price >= filters.priceRange.min &&
-            property.price <= filters.priceRange.max;
-
-      const matchesSize =
-        filters.sizeRange.min === 0 && filters.sizeRange.max === 0
-          ? true
-          : property.size >= filters.sizeRange.min &&
-            property.size <= filters.sizeRange.max;
-
-      const matchesBhk =
-        filters.bhkFilter === null || property.bhk === filters.bhkFilter;
-
-      const matchesType =
-        filters.typeFilter === null || property.type === filters.typeFilter;
-
-      return (
-        matchesSearch &&
-        matchesPrice &&
-        matchesSize &&
-        matchesBhk &&
-        matchesType
-      );
-    });
-  }, [properties, searchQuery, filters]);
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setPagination((prev) => ({ ...prev, page }));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
@@ -126,9 +168,10 @@ const PropertiesPage = () => {
       filters.priceRange.min !== 0 ||
       filters.priceRange.max !== 0 ||
       filters.sizeRange.min !== 0 ||
-      filters.sizeRange.max !== 0
+      filters.sizeRange.max !== 0 ||
+      locationFilter !== null
     );
-  }, [filters]);
+  }, [filters, locationFilter]);
 
   // Get active filter labels
   const activeFilterLabels = useMemo(() => {
@@ -173,6 +216,7 @@ const PropertiesPage = () => {
   // Remove specific filter
   const removeFilter = (key: string) => {
     const newFilters = { ...filters };
+    let shouldReset = true;
 
     switch (key) {
       case "location":
@@ -194,10 +238,24 @@ const PropertiesPage = () => {
       case "size":
         newFilters.sizeRange = { min: 0, max: 0 };
         break;
+      default:
+        shouldReset = false;
     }
 
-    setFilters(newFilters);
+    if (shouldReset) {
+      setFilters(newFilters);
+      setPagination(prev => ({ ...prev, page: 1 }));
+    }
   };
+
+  const handleFilterDrawerChange = (newFilters: FilterState) => {
+    setFilters(newFilters);
+    // Determine if type filter changed specifically to update state
+    if (newFilters.typeFilter !== typeFilter) {
+      setTypeFilter(newFilters.typeFilter);
+    }
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }
 
   return (
     <div className="w-full min-h-screen bg-linear-to-br from-slate-50 to-slate-100 pt-20 pb-10 px-4 md:px-8">
@@ -219,45 +277,20 @@ const PropertiesPage = () => {
           </div>
         </div>
 
-        {/* Loading State */}
+        {/* Loading State - Skeleton */}
         {loading && (
           <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              {Array.from({ length: 12 }).map((_, i) => (
                 <div
                   key={i}
                   className="bg-white rounded-2xl overflow-hidden border border-slate-200 flex flex-col h-full"
                 >
-                  {/* Image Skeleton */}
                   <div className="relative h-56 bg-slate-200 animate-pulse" />
-
-                  {/* Content Skeleton */}
                   <div className="p-5 flex flex-col grow space-y-3">
-                    {/* Name and Price Header */}
-                    <div className="flex items-start justify-between gap-3">
-                      <Skeleton className="h-5 w-3/4" />
-                      <Skeleton className="h-6 w-16" />
-                    </div>
-
-                    {/* Location */}
-                    <div className="flex items-start gap-2">
-                      <Skeleton className="w-4 h-4 mt-0.5" />
-                      <Skeleton className="h-4 w-full" />
-                    </div>
-
-                    {/* Property Details */}
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="w-4 h-4" />
-                        <Skeleton className="h-4 w-12" />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="w-4 h-4" />
-                        <Skeleton className="h-4 w-20" />
-                      </div>
-                    </div>
-
-                    {/* Button Skeleton */}
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-6 w-16" />
+                    <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-10 w-full rounded-lg mt-auto" />
                   </div>
                 </div>
@@ -284,51 +317,122 @@ const PropertiesPage = () => {
             <CardHeader className="text-center">
               <CardTitle>No Properties Found</CardTitle>
               <CardDescription>
-                There are no properties to display at the moment.
+                Try adjusting your search or filters to find what you're looking for.
               </CardDescription>
             </CardHeader>
           </Card>
         )}
 
         {/* Filter Button and Active Filters */}
-        {!loading && !error && properties.length > 0 && (
-          <div className="mb-8">
-            <div className="flex items-center gap-3 flex-wrap">
-              <FilterDrawer
-                properties={properties}
-                onFilterChange={setFilters}
-              />
+        <div className="mb-8">
+          <div className="flex items-center gap-3 flex-wrap">
+            <FilterDrawer
+              properties={properties}
+              stats={stats}
+              onFilterChange={handleFilterDrawerChange}
+            />
 
-              {/* Active Filter Chips */}
-              {hasActiveFilters && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  {activeFilterLabels.map((filter) => (
-                    <div
-                      key={filter.key}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white rounded-full text-sm font-medium"
+            {/* Active Filter Chips */}
+            {hasActiveFilters && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {activeFilterLabels.map((filter) => (
+                  <div
+                    key={filter.key}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white rounded-full text-sm font-medium"
+                  >
+                    <span>{filter.label}</span>
+                    <button
+                      onClick={() => removeFilter(filter.key)}
+                      className="hover:bg-slate-800 rounded-full p-0.5 transition-colors"
+                      title="Remove filter"
                     >
-                      <span>{filter.label}</span>
-                      <button
-                        onClick={() => removeFilter(filter.key)}
-                        className="hover:bg-slate-800 rounded-full p-0.5 transition-colors"
-                        title="Remove filter"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Properties Grid with Fade In */}
+        {!loading && !error && properties.length > 0 && (
+          <div className="animate-fade-in">
+            <style jsx global>{`
+              @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+              }
+              .animate-fade-in {
+                animation: fadeIn 0.5s ease-out forwards;
+              }
+            `}</style>
+            <PropertyCard properties={properties} />
+
+            {/* Pagination Controls */}
+            {pagination.totalPages > 1 && (
+              <div className="mt-10">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (pagination.page > 1) handlePageChange(pagination.page - 1);
+                        }}
+                        className={pagination.page === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+
+                    {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => {
+                      // Simple logic to show limited pages if too many
+                      if (
+                        page === 1 ||
+                        page === pagination.totalPages ||
+                        (page >= pagination.page - 1 && page <= pagination.page + 1)
+                      ) {
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              href="#"
+                              isActive={page === pagination.page}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handlePageChange(page);
+                              }}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      } else if (
+                        page === pagination.page - 2 ||
+                        page === pagination.page + 2
+                      ) {
+                        return <PaginationEllipsis key={page} />;
+                      }
+                      return null;
+                    })}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (pagination.page < pagination.totalPages) handlePageChange(pagination.page + 1);
+                        }}
+                        className={pagination.page === pagination.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </div>
         )}
-
-        {/* Properties Grid */}
-        {!loading && !error && properties.length > 0 && (
-          <PropertyCard properties={filteredProperties} />
-        )}
       </div>
-    </div>
+    </div >
   );
 };
 
